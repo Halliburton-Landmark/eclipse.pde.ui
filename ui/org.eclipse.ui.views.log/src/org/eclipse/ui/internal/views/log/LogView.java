@@ -35,6 +35,7 @@ import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.util.Policy;
 import org.eclipse.jface.viewers.*;
 import org.eclipse.jface.window.Window;
+import org.eclipse.osgi.framework.log.FrameworkLog;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.BusyIndicator;
@@ -50,6 +51,7 @@ import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.dialogs.FilteredTree;
 import org.eclipse.ui.dialogs.PatternFilter;
 import org.eclipse.ui.part.ViewPart;
+import org.osgi.framework.*;
 import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 
@@ -721,6 +723,10 @@ public class LogView extends ViewPart implements ILogListener {
 		dialog.setFilterExtensions(new String[] {"*.log"}); //$NON-NLS-1$
 		if (fDirectory != null)
 			dialog.setFilterPath(fDirectory);
+		FrameworkLog frameworkLog = getFrameworkLog();
+		if (frameworkLog != null && frameworkLog.getFile() != null) {
+			dialog.setFileName(frameworkLog.getFile().getName());
+		}
 		String path = dialog.open();
 		if (path != null) {
 			if (path.indexOf('.') == -1 && !path.endsWith(".log")) //$NON-NLS-1$
@@ -761,6 +767,25 @@ public class LogView extends ViewPart implements ILogListener {
 				}
 			}
 		}
+	}
+
+	private FrameworkLog getFrameworkLog() {
+		Bundle bundle = FrameworkUtil.getBundle(LogView.class);
+		if (bundle == null) {
+			// Launched without OSGI running (e.g. plain JUnit test).
+			return null;
+		}
+
+		BundleContext bundleContext = bundle.getBundleContext();
+		if (bundleContext == null) {
+			return null;
+		}
+
+		ServiceReference<FrameworkLog> serviceRef = bundleContext.getServiceReference(FrameworkLog.class);
+
+		FrameworkLog frameworkLog = bundleContext.getService(serviceRef);
+		bundleContext.ungetService(serviceRef);
+		return frameworkLog;
 	}
 
 	private void copy(BufferedReader reader, BufferedWriter writer) throws IOException {
